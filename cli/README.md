@@ -1,18 +1,25 @@
-﻿# CLI 使用说明
+# CLI 本地使用
 
-## 快速开始
+运行命令，三个 AI 机器人在群里讨论你的需求。
 
-`powershell
-.\lark-cli.ps1 ai chat --chat-id oc_88cdd7c54cf79fca0b959644630f9b6d --text "分析AI客服方案"
-`
+## 发起团队讨论
 
-## 所有命令
+```powershell
+.\lark-cli.ps1 ai chat --chat-id oc_xxx --text "分析AI客服方案"
+```
 
-| 命令 | 说明 |
-|------|------|
-| i chat --chat-id --text | AI 团队讨论（五步自动完成） |
-| im +messages-send --chat-id --text | 手动发消息 |
-| --profile abot | 切换为产品经理身份 |
-| --profile bbot | 切换为研发身份 |
-| profile list | 查看三个身份 |
-| uth status | 查看认证状态 |
+## 手动控制
+
+```powershell
+# 产品总监发言（默认）
+.\lark-cli.ps1 im +messages-send --chat-id oc_xxx --text "内容"
+
+# 产品经理发言
+.\lark-cli.ps1 --profile abot im +messages-send --chat-id oc_xxx --text "内容"
+
+# 研发发言
+.\lark-cli.ps1 --profile bbot im +messages-send --chat-id oc_xxx --text "内容"
+
+# 查看群消息
+.\lark-cli.ps1 im +chat-messages-list --chat-id oc_xxx
+```
