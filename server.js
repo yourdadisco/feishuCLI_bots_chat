@@ -24,7 +24,7 @@ async function getToken(cfg) {
 async function sendMsg(cfg, text) {
   const token = await getToken(cfg);
   // 飞书消息有限制，超长时分段发送
-  const MAX = 1000;
+  const MAX = 2000;
   const parts = [];
   for (let i = 0; i < text.length; i += MAX) {
     parts.push(text.substring(i, i + MAX));
@@ -52,7 +52,7 @@ async function askAI(system, context, name, task) {
         { role: 'system', content: system },
         { role: 'user', content: `用户任务：${task}\n\n${context}\n\n现在${name}发言。针对任务直接给出专业分析。` },
       ],
-      temperature: 0.85, max_tokens: 1200,
+      temperature: 0.85, max_tokens: 3000,
     }),
   });
   return (await r.json()).choices?.[0]?.message?.content?.trim() || '';
