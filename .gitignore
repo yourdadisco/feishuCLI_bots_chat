@@ -1,2 +1,6 @@
 node_modules/
 .env
+
+# 角色设定文件（本地保留）
+角色设定/
+docs/角色设定-*.md
