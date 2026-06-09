@@ -1,20 +1,19 @@
 const express = require('express');
 const app = express();
-app.use(express.json());
+
+// 支持所有 Content-Type 的 body 解析
+app.use(express.json({ type: '*/*' }));
+app.use(express.urlencoded({ extended: true }));
 
 // ======================== 配置 ========================
 const CONFIG = {
-  // 三个 Bot 的凭证（从环境变量读取）
   director: { appId: process.env.DIRECTOR_APP_ID, appSecret: process.env.DIRECTOR_APP_SECRET },
   pm:       { appId: process.env.PM_APP_ID,       appSecret: process.env.PM_APP_SECRET },
   engineer: { appId: process.env.ENGINEER_APP_ID,  appSecret: process.env.ENGINEER_APP_SECRET },
-  // 群聊 ID
   chatId: process.env.CHAT_ID || 'oc_88cdd7c54cf79fca0b959644630f9b6d',
-  // DeepSeek API Key
   apiKey: process.env.DEEPSEEK_API_KEY,
 };
 
-// 已处理消息去重
 const processed = new Set();
 
 // ======================== 飞书 API ========================
@@ -70,7 +69,7 @@ async function callDeepSeek(systemPrompt, context, name, task) {
 
 // ======================== 团队讨论 ========================
 async function runTeamDiscussion(task) {
-  if (processed.has(task)) { return; }
+  if (processed.has(task)) return;
   processed.add(task);
   console.log(`[任务] ${task}`);
 
@@ -94,41 +93,53 @@ async function runTeamDiscussion(task) {
     await sendMessage(CONFIG[step.cfg], msg);
     history.push(`${step.name}: ${msg}`);
     console.log(`  ${step.name}: ${msg.substring(0, 50)}...`);
-    // 等待几秒模拟思考
     await new Promise(r => setTimeout(r, 3000));
   }
-
   console.log(`[完成] ${task}`);
 }
 
 // ======================== Webhook ========================
-app.post('/', async (req, res) => {
-  const body = req.body;
+app.all('*', async (req, res) => {
+  // 设置 CORS 和 JSON 响应头
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
+  // 尝试解析 body（兼容 text/plain 等非 JSON 格式）
+  let body = req.body;
+  if (!body || Object.keys(body).length === 0) {
+    // 如果是空对象，尝试从原始 body 解析
+    if (req.rawBody) {
+      try { body = JSON.parse(req.rawBody); } catch {}
+    }
+  }
+
+  console.log(`[请求] ${req.method} ${req.path}`, JSON.stringify(body).substring(0, 200));
 
   // 飞书 URL 验证挑战
-  if (body.challenge) {
+  if (body && body.challenge) {
+    console.log('[验证] 收到挑战，返回:', body.challenge);
     return res.json({ challenge: body.challenge });
   }
 
   // 处理消息事件
-  if (body.header?.event_type === 'im.message.receive_v1') {
+  if (body && body.header && body.header.event_type === 'im.message.receive_v1') {
     const event = body.event;
-    // 只处理群聊中非 bot 的消息
-    if (event.chat_type === 'group' && event.sender.sender_type !== 'app') {
+    if (event && event.chat_type === 'group' && event.sender && event.sender.sender_type !== 'app') {
       const msgId = event.message_id;
-      let text = event.content;
+      let text = event.content || '';
       try { text = JSON.parse(text).text; } catch {}
-      console.log(`[收到] ${text}`);
-      // 异步处理，立即返回 200
-      runTeamDiscussion(text).catch(e => console.error(e));
+      console.log(`[收到@消息] ${text}`);
+
+      if (msgId && !processed.has(msgId)) {
+        processed.add(msgId);
+        // 异步处理，立即返回 200
+        runTeamDiscussion(text).catch(e => console.error(e));
+      }
     }
   }
 
-  res.status(200).end();
+  res.json({ ok: true });
 });
 
-// ======================== 健康检查 ========================
-app.get('/', (req, res) => res.send('Bot Team Webhook Running'));
-
+// ======================== 启动 ========================
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
