@@ -1,73 +1,67 @@
-# 🤖 Feishu Multi-Bot Team
+﻿# 🤖 飞书多 Agent 协作系统
 
-> 三个 AI 机器人（产品总监 + 产品经理 + 研发工程师）在飞书群里协作讨论，帮你分析需求、评估方案、输出结论。
+三个 AI 机器人（产品总监 + 产品经理 + 研发工程师）在飞书群里协作讨论，帮你分析需求、评估方案、输出结论。
 
 ---
 
-## 两种运行方式
+## 两种使用方案
 
-### 方式一：本地 CLI（即开即用）
+### 方案一：本地 CLI（推荐）
 
-不需要服务器，不需要配置，下载就能跑。
+| 项目 | 说明 |
+|:---|:---|
+| **使用方式** | 打开终端运行命令 |
+| **运行条件** | Windows + PowerShell，无需服务器 |
+| **运行时长** | 即用即走，用完就关 |
+| **优点** | 简单直接，不依赖外部服务，完全本地控制 |
+| **缺点** | 需要手动触发，不能自动响应群消息 |
 
 ```powershell
-# 1. 进入 cli 目录
 cd cli
-
-# 2. 发起团队讨论（AI 自动生成五步讨论）
 .\lark-cli.ps1 ai chat --chat-id oc_88cdd7c54cf79fca0b959644630f9b6d --text "分析AI客服方案"
-
-# 3. 手动发消息
-.\lark-cli.ps1 --profile director im +messages-send --chat-id oc_88cdd7c54cf79fca0b959644630f9b6d --text "你好"
-
-# 4. 查看群消息
-.\lark-cli.ps1 im +chat-messages-list --chat-id oc_88cdd7c54cf79fca0b959644630f9b6d
-
-# 5. 列出三个 Bot 身份
-.\lark-cli.ps1 profile list
 ```
 
-| 参数 | 说明 |
+> 详细用法见 [cli/README.md](cli/README.md)
+
+### 方案二：Zeabur 云部署
+
+| 项目 | 说明 |
 |:---|:---|
-| `--profile director` | 用产品总监身份（默认） |
-| `--profile abot` | 用产品经理身份 |
-| `--profile bbot` | 用研发工程师身份 |
-| `--chat-id oc_xxx` | 飞书群聊 ID |
-| `--text "内容"` | 要发送的消息 / AI 讨论的任务 |
+| **使用方式** | 在飞书群里 @产品总监 发需求 |
+| **运行条件** | Zeabur 部署 + 飞书事件订阅配置 |
+| **运行时长** | 24小时在线，自动响应 |
+| **优点** | 全自动，群里 @一下就行，无需开电脑 |
+| **缺点** | 需要部署配置，依赖 Zeabur 服务 |
 
-### 方式二：Zeabur 云端自动响应（24小时在线）
-
-部署到 Zeabur 后，在群里 @产品总监 发需求，三 Agent 自动讨论出结论。
-
-**部署步骤：**
-1. 把仓库导入 [Zeabur](https://zeabur.com)
-2. 设置环境变量（参考 `.env.example`）
-3. 拿到域名后去飞书开发者后台配置事件订阅
-
-详细部署说明见 `docs/`。
+```
+你在群里 @产品总监 帮我分析AI客服方案
+         ↓ 自动触发
+产品总监 → 产品经理 → 研发 → 产品总监(总结)
+         ↓ 结果发回群聊
+```
 
 ---
 
 ## 项目结构
 
 ```
-feishuCLI_bots_chat/
-├── cli/                    ★ 本地 CLI（推荐）
-│   ├── lark-cli.ps1         命令行工具
+├── cli/                    ★ 方案一：本地CLI工具
+│   ├── lark-cli.ps1         命令行工具（即开即用）
 │   └── README.md            使用说明
-├── server.js               Zeabur 云端部署入口
+├── server.js               ★ 方案二：Zeabur云部署入口
 ├── package.json
 ├── .env.example            环境变量模板
-├── docs/                   文档
+├── docs/
 │   ├── 产品需求文档-PRD.md
 │   ├── 技术设计文档.md
 │   ├── 配置记录.md
 │   └── 飞书CLI实现AB机器人对话指南.md
-└── README.md               本文件
+└── README.md
 ```
 
 ## 注意事项
 
-- CLI 方式需要 PowerShell，仅限 Windows
-- 第一次运行可能需要设置执行策略：`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
-- 控制台显示可能乱码，但不影响飞书群里的消息
+- CLI 方案需要 PowerShell，仅限 Windows
+- 首次运行需设置：`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
+- 控制台中文可能乱码，不影响飞书群消息
+- 两个方案可以同时使用，互不冲突
