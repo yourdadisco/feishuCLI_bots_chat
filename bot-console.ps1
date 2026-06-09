@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   三 Agent 协作控制台
   终端输入任务 → 团队讨论 → 结果发到飞书群
@@ -34,9 +34,9 @@ function Run-Task {
     $global:History=@()
 
     # 人设
-    $DSys="你扮演张总，产品总监。工作：1)@阿博做产品分析 2)@阿布做技术评估 3)给用户总结。围绕用户具体任务展开。"
-    $PSys="你扮演阿博，热情的产品经理。以'@张总'开头。针对用户任务分析需求、市场机会。用表情符号。"
-    $ESys="你扮演阿布，技术负责人。以'@张总'开头。针对用户任务评估可行性、成本、周期。不用表情。"
+    $DSys="你扮演产品总监，产品总监。工作：1)@产品经理做产品分析 2)@研发做技术评估 3)给用户总结。围绕用户具体任务展开。"
+    $PSys="你扮演产品经理，热情的产品经理。以'@产品总监'开头。针对用户任务分析需求、市场机会。用表情符号。"
+    $ESys="你扮演研发，技术负责人。以'@产品总监'开头。针对用户任务评估可行性、成本、周期。不用表情。"
 
     function LLM { param($sys,$ctx,$name,$task,$role)
         try{$p="用户任务：$task`n`n$ctx`n`n$role($name)发言。针对任务直接给出专业分析，不要说需要更多信息。"
@@ -53,17 +53,17 @@ function Run-Task {
 
     # 步骤 1-5
     $steps = @(
-        @{cfg=$dc;sys=$DSys;name='张总';role='张总';extra='用户任务已收到。@阿博做产品分析。';fb="收到任务。@阿博 你做产品分析，分析用户需求和市场机会。"}
-        @{cfg=$pc;sys=$PSys;name='阿博';role='阿博';extra='张总@了你，请做产品分析';fb="@张总 收到！我来分析用户需求🎯"}
-        @{cfg=$dc;sys=$DSys;name='张总';role='张总';extra='阿博分析完了。@阿布做技术评估。';fb="@阿布 你做技术评估，评估可行性、成本、周期。"}
-        @{cfg=$ec;sys=$ESys;name='阿布';role='阿布';extra='张总@了你，请做技术评估';fb="@张总 技术上可行，周期约3个月。"}
-        @{cfg=$dc;sys=$DSys;name='张总';role='张总';extra='双方都发表了意见。请给出完整的总结报告给用户，包含产品分析结论、技术评估结论、综合建议。';fb="【总结】产品分析：... 技术评估：... 建议：..."}
+        @{cfg=$dc;sys=$DSys;name='产品总监';role='产品总监';extra='用户任务已收到。@产品经理做产品分析。';fb="收到任务。@产品经理 你做产品分析，分析用户需求和市场机会。"}
+        @{cfg=$pc;sys=$PSys;name='产品经理';role='产品经理';extra='产品总监@了你，请做产品分析';fb="@产品总监 收到！我来分析用户需求🎯"}
+        @{cfg=$dc;sys=$DSys;name='产品总监';role='产品总监';extra='产品经理分析完了。@研发做技术评估。';fb="@研发 你做技术评估，评估可行性、成本、周期。"}
+        @{cfg=$ec;sys=$ESys;name='研发';role='研发';extra='产品总监@了你，请做技术评估';fb="@产品总监 技术上可行，周期约3个月。"}
+        @{cfg=$dc;sys=$DSys;name='产品总监';role='产品总监';extra='双方都发表了意见。请给出完整的总结报告给用户，包含产品分析结论、技术评估结论、综合建议。';fb="【总结】产品分析：... 技术评估：... 建议：..."}
     )
 
     foreach ($s in $steps) {
         $m = LLM -sys $s.sys -ctx (Ctx) -name $s.name -task $Task -role $s.role
         if (!$m) { $m = $s.fb }
-        $color = if ($s.name -eq '张总') { 'Yellow' } elseif ($s.name -eq '阿博') { 'Cyan' } else { 'Green' }
+        $color = if ($s.name -eq '产品总监') { 'Yellow' } elseif ($s.name -eq '产品经理') { 'Cyan' } else { 'Green' }
         Log "  $($s.name): $m" $color
         Send-Msg $s.cfg $m
         $global:History += "$($s.name): $m"
@@ -76,7 +76,7 @@ function Run-Task {
 Clear-Host
 Write-Host "╔═══════════════════════════════════════════╗" -ForegroundColor Yellow
 Write-Host "║       三 Agent 协作控制台                 ║" -ForegroundColor Yellow
-Write-Host "║   张总 + 阿博(产品) + 阿布(技术)          ║" -ForegroundColor Yellow
+Write-Host "║   产品总监 + 产品经理(产品) + 研发(技术)          ║" -ForegroundColor Yellow
 Write-Host "║                                           ║" -ForegroundColor Yellow
 Write-Host "║  输入你的任务，团队讨论后发结果到飞书群    ║" -ForegroundColor Yellow
 Write-Host "║  输入 exit 退出                           ║" -ForegroundColor Yellow
@@ -91,7 +91,7 @@ while ($true) {
     if ($input -eq 'exit') { Write-Host "bye!" -ForegroundColor Yellow; break }
     if ($input -eq 'status') {
         Write-Host "群聊: $ChatId" -ForegroundColor DarkGray
-        Write-Host "机器人: 张总 + 阿博 + 阿布" -ForegroundColor DarkGray
+        Write-Host "机器人: 产品总监 + 产品经理 + 研发" -ForegroundColor DarkGray
         continue
     }
     if ([string]::IsNullOrWhiteSpace($input)) { continue }

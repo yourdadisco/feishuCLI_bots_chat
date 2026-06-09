@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Webhook 服务 - 接收飞书 @消息事件，触发三 Agent 讨论
 .DESCRIPTION
@@ -6,7 +6,7 @@
   1. 运行本脚本（启动 HTTP 服务在 8888 端口）
   2. 另开终端运行: ngrok http 8888
   3. 把 ngrok URL 配置到飞书开发者后台的「事件订阅」
-  4. 在群里 @张总 + 你的需求，三 Agent 自动响应
+  4. 在群里 @产品总监 + 你的需求，三 Agent 自动响应
 #>
 
 # ===== Bot 凭证 =====
@@ -39,9 +39,9 @@ function Start-Team {
     if($Task -in $processed){Log "  已处理过，跳过: $Task" 'DarkGray';return}
     $processed+=$Task
     $global:History=@()
-    $DSys="你是张总，产品总监。工作：1)@阿博做产品分析 2)@阿布做技术评估 3)给用户总结。围绕用户任务。"
-    $PSys="你是阿博，热情产品经理。@张总开头。分析用户需求、市场机会。用表情。"
-    $ESys="你是阿布，技术负责人。@张总开头。评估可行性、成本、周期。不用表情。"
+    $DSys="你是产品总监，产品总监。工作：1)@产品经理做产品分析 2)@研发做技术评估 3)给用户总结。围绕用户任务。"
+    $PSys="你是产品经理，热情产品经理。@产品总监开头。分析用户需求、市场机会。用表情。"
+    $ESys="你是研发，技术负责人。@产品总监开头。评估可行性、成本、周期。不用表情。"
 
     function LLM { param($sys,$ctx,$name,$task,$role)
         try{$p="用户任务：$task`n`n$ctx`n`n$role($name)发言。直接分析。"
@@ -54,11 +54,11 @@ function Start-Team {
 
     Log "  → 任务: $Task" 'Cyan'
     foreach($step in @(
-        @{role='director';cfg=$dc;sys=$DSys;name='张总';extra='@阿博做产品分析';fallback="收到任务。@阿博 你先做产品分析。"}
-        @{role='pm';cfg=$pc;sys=$PSys;name='阿博';extra='张总@了你，做产品分析';fallback="@张总 用户需求分析🎯"}
-        @{role='director';cfg=$dc;sys=$DSys;name='张总';extra='@阿布做技术评估';fallback="@阿布 你做技术评估。"}
-        @{role='engineer';cfg=$ec;sys=$ESys;name='阿布';extra='张总@了你，做技术评估';fallback="@张总 技术上可行。"}
-        @{role='director';cfg=$dc;sys=$DSys;name='张总';extra='给出完整总结给用户';fallback="【总结】产品分析：... 技术评估：... 建议：..."}
+        @{role='director';cfg=$dc;sys=$DSys;name='产品总监';extra='@产品经理做产品分析';fallback="收到任务。@产品经理 你先做产品分析。"}
+        @{role='pm';cfg=$pc;sys=$PSys;name='产品经理';extra='产品总监@了你，做产品分析';fallback="@产品总监 用户需求分析🎯"}
+        @{role='director';cfg=$dc;sys=$DSys;name='产品总监';extra='@研发做技术评估';fallback="@研发 你做技术评估。"}
+        @{role='engineer';cfg=$ec;sys=$ESys;name='研发';extra='产品总监@了你，做技术评估';fallback="@产品总监 技术上可行。"}
+        @{role='director';cfg=$dc;sys=$DSys;name='产品总监';extra='给出完整总结给用户';fallback="【总结】产品分析：... 技术评估：... 建议：..."}
     )){
         $m=LLM -sys $step.sys -ctx (Ctx) -name $step.name -task $Task -role $step.name
         if(!$m){$m=$step.fallback}

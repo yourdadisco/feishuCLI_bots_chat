@@ -1,9 +1,9 @@
-<#
+﻿<#
 .SYNOPSIS
-  三 Agent 守护模式 - 你在群里@张总，机器人自动响应
+  三 Agent 守护模式 - 你在群里@产品总监，机器人自动响应
 .DESCRIPTION
   *** 使用前需要在飞书开发者后台加权限 ***
-  群聊中 @张总 + 你的需求 → 三人团队自动讨论 → 给出结论
+  群聊中 @产品总监 + 你的需求 → 三人团队自动讨论 → 给出结论
   按 Ctrl+C 停止
 #>
 
@@ -57,9 +57,9 @@ function Get-Messages {
 function Start-TeamTask {
     param([string]$Task)
     $global:History=@()
-    $DSys="你是张总，产品总监。你的团队：阿博（产品经理）、阿布（研发）。用户给了一个任务，你要：1)@阿博做产品分析 2)@阿布做技术评估 3)给用户总结。围绕用户任务。"
-    $PSys="你是阿博，热情的产品经理。以'@张总'开头。针对用户任务做产品分析（用户需求、目标用户、市场机会、产品建议）。用表情符号。"
-    $ESys="你是阿布，技术负责人。以'@张总'开头。针对用户任务做技术评估（可行性、成本、周期、技术方案）。不用表情。"
+    $DSys="你是产品总监，产品总监。你的团队：产品经理（产品经理）、研发（研发）。用户给了一个任务，你要：1)@产品经理做产品分析 2)@研发做技术评估 3)给用户总结。围绕用户任务。"
+    $PSys="你是产品经理，热情的产品经理。以'@产品总监'开头。针对用户任务做产品分析（用户需求、目标用户、市场机会、产品建议）。用表情符号。"
+    $ESys="你是研发，技术负责人。以'@产品总监'开头。针对用户任务做技术评估（可行性、成本、周期、技术方案）。不用表情。"
 
     function LLM { param($sys,$ctx,$name,$task,$role)
         try{$p="用户任务：$task`n`n$ctx`n`n$role($name)发言。针对任务直接分析，不要说需要更多信息。"
@@ -74,37 +74,37 @@ function Start-TeamTask {
 
     Log "  → 收到任务: $Task" 'Cyan'
 
-    # 张总
-    $m=LLM -sys $DSys -ctx '' -name '张总' -task $Task -role '张总'
-    if(!$m){$m="收到任务。@阿博 你先做产品分析。"}
-    Send-Msg $dc $m;$global:History+="张总: $m";Start-Sleep 3
+    # 产品总监
+    $m=LLM -sys $DSys -ctx '' -name '产品总监' -task $Task -role '产品总监'
+    if(!$m){$m="收到任务。@产品经理 你先做产品分析。"}
+    Send-Msg $dc $m;$global:History+="产品总监: $m";Start-Sleep 3
 
-    # 阿博
-    $m=LLM -sys $PSys -ctx (Ctx) -name '阿博' -task $Task -role '阿博'
-    if(!$m){$m="@张总 用户需求分析如下🎯"}
-    Send-Msg $pc $m;$global:History+="阿博: $m";Start-Sleep 3
+    # 产品经理
+    $m=LLM -sys $PSys -ctx (Ctx) -name '产品经理' -task $Task -role '产品经理'
+    if(!$m){$m="@产品总监 用户需求分析如下🎯"}
+    Send-Msg $pc $m;$global:History+="产品经理: $m";Start-Sleep 3
 
-    # 张总@阿布
-    $m=LLM -sys $DSys -ctx (Ctx) -name '张总' -task $Task -role '张总'
-    if(!$m){$m="@阿布 你做技术评估。"}
-    Send-Msg $dc $m;$global:History+="张总: $m";Start-Sleep 3
+    # 产品总监@研发
+    $m=LLM -sys $DSys -ctx (Ctx) -name '产品总监' -task $Task -role '产品总监'
+    if(!$m){$m="@研发 你做技术评估。"}
+    Send-Msg $dc $m;$global:History+="产品总监: $m";Start-Sleep 3
 
-    # 阿布
-    $m=LLM -sys $ESys -ctx (Ctx) -name '阿布' -task $Task -role '阿布'
-    if(!$m){$m="@张总 技术上可行。"}
-    Send-Msg $ec $m;$global:History+="阿布: $m";Start-Sleep 3
+    # 研发
+    $m=LLM -sys $ESys -ctx (Ctx) -name '研发' -task $Task -role '研发'
+    if(!$m){$m="@产品总监 技术上可行。"}
+    Send-Msg $ec $m;$global:History+="研发: $m";Start-Sleep 3
 
-    # 张总总结
-    $m=LLM -sys $DSys -ctx (Ctx) -name '张总' -task $Task -role '张总'
+    # 产品总监总结
+    $m=LLM -sys $DSys -ctx (Ctx) -name '产品总监' -task $Task -role '产品总监'
     if(!$m){$m="【总结】产品分析：... 技术评估：... 建议：..."}
-    Send-Msg $dc $m;$global:History+="张总: $m"
+    Send-Msg $dc $m;$global:History+="产品总监: $m"
     Log "  ✅ 任务完成！" 'Green'
 }
 
 # ===== 主循环 =====
 Log "==============================================" 'Yellow'
 Log "  三 Agent 守护模式" 'Yellow'
-Log "  张总 + 阿博(产品) + 阿布(技术)" 'Yellow'
+Log "  产品总监 + 产品经理(产品) + 研发(技术)" 'Yellow'
 Log "  群聊: $ChatId" 'Yellow'
 Log "  按 Ctrl+C 停止" 'Yellow'
 Log "==============================================" 'Yellow'
