@@ -85,6 +85,7 @@ $ChatId="oc_你的群聊ID"
 **本地直接运行（简单模式）：**
 
 ```powershell
+cd scripts
 .\bot-console.ps1
 ```
 
@@ -132,19 +133,34 @@ lt --port 8888
 
 ---
 
-## 📁 项目文件说明
+## 📁 项目结构
 
-| 文件 | 说明 |
-|:---|:---|
-| `bot-console.ps1` | ⭐ **推荐** 终端交互版，输入任务即可触发团队讨论 |
-| `bot-team.ps1` | 一次性任务脚本，`.\bot-team.ps1 -Task "你的需求"` |
-| `bot-webhook.ps1` | Webhook 服务，配合隧道接收飞书事件推送 |
-| `bot-dialogue.ps1` | 双机器人对话脚本（旧版），让 Abot 和 Bbot 自由聊天 |
-| `bot-daemon.ps1` | 双机器人守护脚本（旧版），持续对话 |
-| `zeabur-bot-team/` | Zeabur 部署项目（Node.js + Express） |
-| `Abot人设.md` | 产品经理角色设定 |
-| `Bbot人设.md` | 研发工程师角色设定 |
-| `ABot配置记录.md` | 应用凭证记录 |
+```
+├── server.js               Zeabur 部署入口 (Node.js HTTP)
+├── package.json            Node.js 配置
+├── .env.example            环境变量模板
+├── README.md               本文件
+│
+├── docs/                   文档
+│   ├── 产品需求文档-PRD.md      产品需求文档
+│   ├── 技术设计文档.md          技术设计文档
+│   ├── 配置记录.md              应用凭证和配置
+│   ├── 角色设定-产品经理.md       产品经理人设
+│   ├── 角色设定-研发工程师.md     研发工程师人设
+│   └── 飞书CLI实现AB机器人对话指南.md
+│
+├── scripts/                本地 PowerShell 脚本
+│   ├── bot-console.ps1     ⭐ 交互式控制台（输入任务→群聊出结果）
+│   ├── bot-team.ps1        一次性任务脚本
+│   ├── bot-webhook.ps1     本地 Webhook 调试
+│   ├── bot-daemon.ps1      (旧版) 双Bot自由对话
+│   ├── bot-daemon-v2.ps1   (旧版) 守护模式
+│   └── bot-dialogue.ps1    (旧版) 双Bot对话
+│
+└── examples/               参考案例
+    └── AI热点解析助手-PRD.md     AI热点解析助手需求文档
+    └── AI热点解析助手-技术设计.md  AI热点解析助手技术文档
+```
 
 ---
 
