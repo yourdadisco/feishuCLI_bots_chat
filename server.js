@@ -111,15 +111,24 @@ const server = http.createServer(async (req, res) => {
         // 消息事件
         if (data.header?.event_type === 'im.message.receive_v1') {
           const ev = data.event;
-          if (ev?.chat_type === 'group' && ev?.sender?.sender_type !== 'app') {
-            let text = ev.content || '';
+          console.log('[事件]', JSON.stringify(data).substring(0, 500));
+
+          // 兼容两种事件格式: flat 和 {message: {...}}
+          const chatType = ev.chat_type || ev.message?.chat_type;
+          const senderType = ev.sender?.sender_type || ev.sender_type;
+          const msgId = ev.message_id || ev.message?.message_id;
+          let rawContent = ev.content || ev.message?.content || '';
+
+          if (chatType === 'group' && senderType !== 'app') {
+            let text = rawContent;
             try { text = JSON.parse(text).text; } catch {}
-            const msgId = ev.message_id;
-            console.log(`[收到@消息] ${text}`);
+            console.log(`[收到@消息] ID=${msgId} 内容=${text}`);
             if (msgId && !processed.has(msgId)) {
               processed.add(msgId);
               runTeam(text).catch(e => console.error(e));
             }
+          } else {
+            console.log(`[跳过] chatType=${chatType} senderType=${senderType}`);
           }
         }
 
