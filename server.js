@@ -23,22 +23,14 @@ async function getToken(cfg) {
 
 async function sendMsg(cfg, text) {
   const token = await getToken(cfg);
-  // 飞书消息有限制，超长时分段发送
-  const MAX = 2000;
-  const parts = [];
-  for (let i = 0; i < text.length; i += MAX) {
-    parts.push(text.substring(i, i + MAX));
-  }
-  for (const part of parts) {
-    await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json; charset=utf-8' },
-      body: JSON.stringify({
-        receive_id: CFG.chatId, msg_type: 'text',
-        content: JSON.stringify({ text: part.replace(/"/g, '\\"') }),
-      }),
-    });
-  }
+  await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({
+      receive_id: CFG.chatId, msg_type: 'text',
+      content: JSON.stringify({ text: text.replace(/"/g, '\\"') }),
+    }),
+  });
 }
 
 // ======================== DeepSeek ========================
@@ -52,7 +44,7 @@ async function askAI(system, context, name, task) {
         { role: 'system', content: system },
         { role: 'user', content: `用户任务：${task}\n\n${context}\n\n现在${name}发言。针对任务直接给出专业分析。` },
       ],
-      temperature: 0.85, max_tokens: 3000,
+      temperature: 0.85, max_tokens: 400,
     }),
   });
   return (await r.json()).choices?.[0]?.message?.content?.trim() || '';
@@ -66,11 +58,11 @@ async function runTeam(task) {
   const h = [];
   const ctx = () => h.slice(-20).join('\n');
   const steps = [
-    { k: 'director', s: '你是产品总监，产品总监。工作：1)@产品经理做产品分析 2)@研发做技术评估 3)给总结。', n: '产品总监', fb: '@产品经理 你做产品分析。' },
-    { k: 'pm', s: '你是产品经理，产品经理。以@产品总监开头。分析需求、市场。用表情。', n: '产品经理', fb: '@产品总监 我来分析用户需求🎯' },
-    { k: 'director', s: '你是产品总监，产品总监。工作：1)@产品经理做产品分析 2)@研发做技术评估 3)给总结。', n: '产品总监', fb: '@研发 你做技术评估。' },
-    { k: 'engineer', s: '你是研发，技术负责人。以@产品总监开头。评估可行性、成本。不用表情。', n: '研发', fb: '@产品总监 技术上可行。' },
-    { k: 'director', s: '你是产品总监，产品总监。工作：1)@产品经理做产品分析 2)@研发做技术评估 3)给总结。', n: '产品总监', fb: '【总结】产品分析结论+技术评估+建议。' },
+    { k: 'director', s: '你是张总，产品总监。工作：1)@阿博做产品分析 2)@阿布做技术评估 3)给总结。', n: '张总', fb: '@阿博 你做产品分析。' },
+    { k: 'pm', s: '你是阿博，产品经理。以@张总开头。分析需求、市场。用表情。', n: '阿博', fb: '@张总 我来分析用户需求🎯' },
+    { k: 'director', s: '你是张总，产品总监。工作：1)@阿博做产品分析 2)@阿布做技术评估 3)给总结。', n: '张总', fb: '@阿布 你做技术评估。' },
+    { k: 'engineer', s: '你是阿布，技术负责人。以@张总开头。评估可行性、成本。不用表情。', n: '阿布', fb: '@张总 技术上可行。' },
+    { k: 'director', s: '你是张总，产品总监。工作：1)@阿博做产品分析 2)@阿布做技术评估 3)给总结。', n: '张总', fb: '【总结】产品分析结论+技术评估+建议。' },
   ];
   for (const s of steps) {
     const msg = await askAI(s.s, ctx(), s.n, task) || s.fb;
@@ -119,24 +111,22 @@ const server = http.createServer(async (req, res) => {
         // 消息事件
         if (data.header?.event_type === 'im.message.receive_v1') {
           const ev = data.event;
-          console.log('[事件]', JSON.stringify(data).substring(0, 500));
-
-          // 兼容两种事件格式: flat 和 {message: {...}}
-          const chatType = ev.chat_type || ev.message?.chat_type;
-          const senderType = ev.sender?.sender_type || ev.sender_type;
-          const msgId = ev.message_id || ev.message?.message_id;
-          let rawContent = ev.content || ev.message?.content || '';
-
-          if (chatType === 'group' && senderType !== 'app') {
-            let text = rawContent;
+          if (ev?.chat_type === 'group' && ev?.sender?.sender_type !== 'app') {
+            let text = ev.content || '';
             try { text = JSON.parse(text).text; } catch {}
-            console.log(`[收到@消息] ID=${msgId} 内容=${text}`);
+            // 替换 @_user_X 为实际用户名
+            const mentions = ev.mentions || ev.message?.mentions || [];
+            for (const m of mentions) {
+              if (m.key && m.name) {
+                text = text.replaceAll(m.key, m.name);
+              }
+            }
+            const msgId = ev.message_id || ev.message?.message_id;
+            console.log(`[收到@消息] ${text}`);
             if (msgId && !processed.has(msgId)) {
               processed.add(msgId);
               runTeam(text).catch(e => console.error(e));
             }
-          } else {
-            console.log(`[跳过] chatType=${chatType} senderType=${senderType}`);
           }
         }
 
