@@ -1,15 +1,11 @@
-const express = require('express');
-const app = express();
-
-// 支持所有 Content-Type 的 body 解析
-app.use(express.json({ type: '*/*' }));
-app.use(express.urlencoded({ extended: true }));
+const http = require('http');
+const https = require('https');
 
 // ======================== 配置 ========================
-const CONFIG = {
-  director: { appId: process.env.DIRECTOR_APP_ID, appSecret: process.env.DIRECTOR_APP_SECRET },
-  pm:       { appId: process.env.PM_APP_ID,       appSecret: process.env.PM_APP_SECRET },
-  engineer: { appId: process.env.ENGINEER_APP_ID,  appSecret: process.env.ENGINEER_APP_SECRET },
+const CFG = {
+  director: { id: process.env.DIRECTOR_APP_ID, secret: process.env.DIRECTOR_APP_SECRET },
+  pm:       { id: process.env.PM_APP_ID,       secret: process.env.PM_APP_SECRET },
+  engineer: { id: process.env.ENGINEER_APP_ID,  secret: process.env.ENGINEER_APP_SECRET },
   chatId: process.env.CHAT_ID || 'oc_88cdd7c54cf79fca0b959644630f9b6d',
   apiKey: process.env.DEEPSEEK_API_KEY,
 };
@@ -19,127 +15,129 @@ const processed = new Set();
 // ======================== 飞书 API ========================
 async function getToken(cfg) {
   const r = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ app_id: cfg.appId, app_secret: cfg.appSecret }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ app_id: cfg.id, app_secret: cfg.secret }),
   });
-  const data = await r.json();
-  return data.tenant_access_token;
+  return (await r.json()).tenant_access_token;
 }
 
-async function sendMessage(cfg, text) {
+async function sendMsg(cfg, text) {
   const token = await getToken(cfg);
-  const safe = text.replace(/"/g, '\\"').replace(/\n/g, '\\n');
-  await fetch(`https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id`, {
+  await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json; charset=utf-8',
-    },
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json; charset=utf-8' },
     body: JSON.stringify({
-      receive_id: CONFIG.chatId,
-      msg_type: 'text',
-      content: JSON.stringify({ text }),
+      receive_id: CFG.chatId, msg_type: 'text',
+      content: JSON.stringify({ text: text.replace(/"/g, '\\"') }),
     }),
   });
 }
 
-// ======================== DeepSeek AI ========================
-async function callDeepSeek(systemPrompt, context, name, task) {
-  const userPrompt = `用户任务：${task}\n\n${context}\n\n现在${name}发言。针对任务直接给出专业分析，不要说需要更多信息。`;
+// ======================== DeepSeek ========================
+async function askAI(system, context, name, task) {
   const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${CONFIG.apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Authorization': `Bearer ${CFG.apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'deepseek-chat',
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
+        { role: 'system', content: system },
+        { role: 'user', content: `用户任务：${task}\n\n${context}\n\n现在${name}发言。针对任务直接给出专业分析。` },
       ],
-      temperature: 0.85,
-      max_tokens: 400,
+      temperature: 0.85, max_tokens: 400,
     }),
   });
-  const data = await r.json();
-  return data.choices?.[0]?.message?.content?.trim() || '';
+  return (await r.json()).choices?.[0]?.message?.content?.trim() || '';
 }
 
 // ======================== 团队讨论 ========================
-async function runTeamDiscussion(task) {
+async function runTeam(task) {
   if (processed.has(task)) return;
   processed.add(task);
   console.log(`[任务] ${task}`);
-
-  const history = [];
-  const ctx = () => history.slice(-20).join('\n');
-
-  const directorSys = '你是张总，产品总监，团队决策者。工作：1)@阿博做产品分析 2)@阿布做技术评估 3)给用户总结。围绕用户具体任务。每条消息以@开头。';
-  const pmSys = '你是阿博，热情的产品经理。以"@张总"开头。针对用户任务分析需求、目标用户、市场机会。用表情符号。';
-  const engineerSys = '你是阿布，技术负责人。以"@张总"开头。针对用户任务评估可行性、成本、周期。不用表情。';
-
+  const h = [];
+  const ctx = () => h.slice(-20).join('\n');
   const steps = [
-    { cfg: 'director', sys: directorSys, name: '张总', fallback: '@阿博 你做产品分析，分析用户需求。' },
-    { cfg: 'pm', sys: pmSys, name: '阿博', fallback: '@张总 我来分析用户需求🎯' },
-    { cfg: 'director', sys: directorSys, name: '张总', fallback: '@阿布 你做技术评估。' },
-    { cfg: 'engineer', sys: engineerSys, name: '阿布', fallback: '@张总 技术上可行。' },
-    { cfg: 'director', sys: directorSys, name: '张总', fallback: '【总结】产品分析：... 技术评估：... 建议：...' },
+    { k: 'director', s: '你是张总，产品总监。工作：1)@阿博做产品分析 2)@阿布做技术评估 3)给总结。', n: '张总', fb: '@阿博 你做产品分析。' },
+    { k: 'pm', s: '你是阿博，产品经理。以@张总开头。分析需求、市场。用表情。', n: '阿博', fb: '@张总 我来分析用户需求🎯' },
+    { k: 'director', s: '你是张总，产品总监。工作：1)@阿博做产品分析 2)@阿布做技术评估 3)给总结。', n: '张总', fb: '@阿布 你做技术评估。' },
+    { k: 'engineer', s: '你是阿布，技术负责人。以@张总开头。评估可行性、成本。不用表情。', n: '阿布', fb: '@张总 技术上可行。' },
+    { k: 'director', s: '你是张总，产品总监。工作：1)@阿博做产品分析 2)@阿布做技术评估 3)给总结。', n: '张总', fb: '【总结】产品分析结论+技术评估+建议。' },
   ];
-
-  for (const step of steps) {
-    const msg = await callDeepSeek(step.sys, ctx(), step.name, task) || step.fallback;
-    await sendMessage(CONFIG[step.cfg], msg);
-    history.push(`${step.name}: ${msg}`);
-    console.log(`  ${step.name}: ${msg.substring(0, 50)}...`);
+  for (const s of steps) {
+    const msg = await askAI(s.s, ctx(), s.n, task) || s.fb;
+    await sendMsg(CFG[s.k], msg);
+    h.push(`${s.n}: ${msg}`);
+    console.log(`  ${s.n}: ${msg.substring(0, 50)}`);
     await new Promise(r => setTimeout(r, 3000));
   }
   console.log(`[完成] ${task}`);
 }
 
-// ======================== Webhook ========================
-app.all('*', async (req, res) => {
-  // 设置 CORS 和 JSON 响应头
+// ======================== HTTP 服务 ========================
+const server = http.createServer(async (req, res) => {
+  // 统一响应头
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Access-Control-Allow-Origin', '*');
 
-  // 尝试解析 body（兼容 text/plain 等非 JSON 格式）
-  let body = req.body;
-  if (!body || Object.keys(body).length === 0) {
-    // 如果是空对象，尝试从原始 body 解析
-    if (req.rawBody) {
-      try { body = JSON.parse(req.rawBody); } catch {}
-    }
-  }
+  // 收集 body
+  let body = '';
+  req.on('data', chunk => body += chunk);
+  req.on('end', async () => {
+    try {
+      console.log(`[${req.method}] ${req.url}`);
 
-  console.log(`[请求] ${req.method} ${req.path}`, JSON.stringify(body).substring(0, 200));
-
-  // 飞书 URL 验证挑战
-  if (body && body.challenge) {
-    console.log('[验证] 收到挑战，返回:', body.challenge);
-    return res.json({ challenge: body.challenge });
-  }
-
-  // 处理消息事件
-  if (body && body.header && body.header.event_type === 'im.message.receive_v1') {
-    const event = body.event;
-    if (event && event.chat_type === 'group' && event.sender && event.sender.sender_type !== 'app') {
-      const msgId = event.message_id;
-      let text = event.content || '';
-      try { text = JSON.parse(text).text; } catch {}
-      console.log(`[收到@消息] ${text}`);
-
-      if (msgId && !processed.has(msgId)) {
-        processed.add(msgId);
-        // 异步处理，立即返回 200
-        runTeamDiscussion(text).catch(e => console.error(e));
+      // GET - 健康检查
+      if (req.method === 'GET') {
+        res.writeHead(200);
+        return res.end(JSON.stringify({ status: 'ok', message: 'Bot Team Webhook Running' }));
       }
-    }
-  }
 
-  res.json({ ok: true });
+      // POST - 处理事件
+      if (req.method === 'POST') {
+        let data;
+        try { data = JSON.parse(body); } catch {
+          res.writeHead(400);
+          return res.end(JSON.stringify({ error: 'invalid json' }));
+        }
+
+        // 飞书 URL 验证挑战
+        if (data.challenge) {
+          console.log(`[验证] challenge: ${data.challenge}`);
+          res.writeHead(200);
+          return res.end(JSON.stringify({ challenge: data.challenge }));
+        }
+
+        // 消息事件
+        if (data.header?.event_type === 'im.message.receive_v1') {
+          const ev = data.event;
+          if (ev?.chat_type === 'group' && ev?.sender?.sender_type !== 'app') {
+            let text = ev.content || '';
+            try { text = JSON.parse(text).text; } catch {}
+            const msgId = ev.message_id;
+            console.log(`[收到@消息] ${text}`);
+            if (msgId && !processed.has(msgId)) {
+              processed.add(msgId);
+              runTeam(text).catch(e => console.error(e));
+            }
+          }
+        }
+
+        res.writeHead(200);
+        return res.end(JSON.stringify({ ok: true }));
+      }
+
+      // 其他方法
+      res.writeHead(405);
+      res.end(JSON.stringify({ error: 'method not allowed' }));
+
+    } catch (e) {
+      console.error('[错误]', e);
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+  });
 });
 
-// ======================== 启动 ========================
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));

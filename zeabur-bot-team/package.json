@@ -1,12 +1,9 @@
 {
   "name": "bot-team-zeabur",
   "version": "1.0.0",
-  "description": "三Agent协作系统 - Zeabur部署版",
+  "description": "三Agent协作系统 - 飞书群聊自动响应",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2"
   }
 }
